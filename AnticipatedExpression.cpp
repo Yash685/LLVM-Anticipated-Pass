@@ -174,21 +174,6 @@ namespace{
                 return true;
             return false;
         }
-        std::set<Expression *> computeExpressionBB(BasicBlock &BB){
-            std::set<Expression *> expressions;
-                for(Instruction &I: BB){
-                    if(isFeasibleInstruction(I)){
-                        Expression *expr = new Expression;
-                        expr->op1 = I.getOperand(0);
-                        expr->op2 = I.getOperand(1);
-                        expr->opcode = I.getOpcode();
-                        expr->opname = I.getOpcodeName(I.getOpcode());
-                        expr->I = &I;
-                        expressions.insert(expr);
-                    }
-            }
-            return expressions;
-        }
 
         std::set<Expression *> computeExpression(Function &F, DenseMap<Expression *, unsigned> &exToBit, unsigned k){
             std::set<Expression *> expressions;
@@ -236,16 +221,48 @@ namespace{
             bool modified = true;
             while(modified){
                 modified = false;
-                for(auto &BB: F){
-
+                for(auto &BB: reverse(F)){
+                    BitVector INBit = INBitMap[&BB];
+                    BitVector OUTBit = OUTBitMap[&BB];
+                    BitVector UseBit = UseBitMap[&BB];
+                    BitVector DefBit = DefBitMap[&BB];
+                    BitVector tempBit(size, false);
+                    for(BasicBlock *succ: successors(&BB)){
+                        BitVector INBit = INBitMap[succ];
+                        OUTBit &= INBit;
+                    }
+                    OUTBitMap[&BB] = OUTBit;
+                    for (unsigned i = 0; i < OUTBit.size(); ++i) {
+                        if (DefBit.test(i)) {
+                            OUTBit.reset(i);
+                        }
+                    }
+                    OUTBit|=UseBit;
+                    if(!(OUTBit == INBit) ){
+                        modified = true;
+                    }
+                    INBitMap[&BB] = OUTBit;
                 }
             }
             printMap(useMap, "USE", F);
             printMap(defMap, "DEF", F);
             printMapping(exToBit);
+            errs() << "IN\n";
+            printBitMap(F, INBitMap);
+            errs() << "OUT\n";
+            printBitMap(F, OUTBitMap);
             return true;
         }
 
+        void printBitMap(Function &F, std::map<BasicBlock *, BitVector> bmap){
+            for(auto &BB: F){
+                BitVector temp = bmap[&BB];
+                for (int i = 0; i < temp.size(); i++) {
+                    errs() << temp[i];
+                }
+                errs() << "\n";
+            }
+        }
         
         // Compute BIT
         std::map<BasicBlock *, BitVector> computeBIT(Function &F, std::map<BasicBlock *, std::set<Expression *>> ds, DenseMap<Expression *, unsigned> exToBit, unsigned int size){
@@ -330,9 +347,10 @@ namespace{
             return defMap;
         }
 
-        void initialiseIN_OUT(Function &F, std::map<BasicBlock *, BitVector> &IN, std::map<BasicBlock *, BitVector> &OUT, unsigned size){
+        void initialiseIN_OUT(Function &F, std::map<BasicBlock *, BitVector> &IN,std::map<BasicBlock *, BitVector> &OUT,unsigned size){
             for(auto &BB: F){
-                IN[&BB] = computeExpressionBB(Function &F, DenseMap<Expression *, unsigned int> &exToBit, unsigned int k)
+                IN[&BB] = BitVector(size, true);
+                OUT[&BB] = BitVector(size, true);
             }
         }
         // // Compute IN
