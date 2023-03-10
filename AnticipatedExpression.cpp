@@ -12,142 +12,6 @@
 #include <utility>
 using namespace llvm;
 
-// namespace{
-//     struct AnticipatedExpressions: public FunctionPass{
-//         static char ID;
-//         AnticipatedExpressions(): FunctionPass(ID){}
-
-//         bool runOnFunction(Function &F) override{
-//             std::map<BasicBlock*, std::set<Value*>> IN,OUT, USE, DEF;
-//             for(auto &BB: F){
-//                 IN[&BB] = std::set<Value*>();
-//                 OUT[&BB] = std::set<Value*>();
-//                 for(auto &I: BB){
-//                     if(auto *inst = dyn_cast<Instruction>(&I)){
-//                         IN[&BB].insert(inst);
-//                     }
-//                 }
-//             }
-
-//             // Compute USE and DEF for each block
-//             for(auto &BB: F){
-//                 USE[&BB] = computeUSE(BB);
-//                 DEF[&BB] = computeDEF(BB);
-//             }
-
-//             // Finding IN and OUT sets
-//             bool changed = true;
-//             while (changed) {
-//                 changed = false;
-//                 for (auto &BB : F) {
-//                     std::set<Value*> in_set = IN[&BB];
-//                     std::set<Value*> out_set = OUT[&BB];
-//                     for (BasicBlock *succ : successors(&BB)) {
-//                         std::set<Value*> succ_in = IN[succ];
-//                         std::set_intersection(succ_in.begin(), succ_in.end(),
-//                                                 out_set.begin(), in_set.end(),
-//                                                 std::inserter(out_set, out_set.begin()));
-//                     }
-//                     std::set_difference(out_set.begin(), out_set.end(),
-//                                         DEF[&BB].begin(), DEF[&BB].end(),
-//                                         std::inserter(in_set, in_set.begin()));
-//                     std::set_union(in_set.begin(), in_set.end(),
-//                                     USE[&BB].begin(), USE[&BB].end(),
-//                                     std::inserter(in_set,in_set.begin()));
-//                     std::set<Value*> old_in_set = IN[&BB];
-
-//                     errs() << "IN: \n";
-//                     for (Value *V : old_in_set) {
-//                         V->print(errs());
-//                         errs() << "\n";
-//                     }
-//                     errs() << "\n";
-
-//                     errs() << "OUT :\n";
-//                     for (Value *V : out_set) {
-//                         V->print(errs());
-//                         errs() << "\n";
-//                     }
-//                     errs() << "\n";
-            
-//                     if (old_in_set != in_set) {
-//                         changed = true;
-//                     }
-//                     IN[&BB] = in_set;
-//                     OUT[&BB] = out_set;
-//                 }
-//             }
-            
-//             return true;
-//         }
-//         std::set<Value*> computeUSE(BasicBlock &BB){
-//             std::set<Value*> temp_set;
-//             std::set<Value*> use_set;
-//                 for (auto &I : BB) {
-//                     if (auto bin_op = dyn_cast<BinaryOperator>(&I)) {
-
-//                         Value *lop = bin_op->getOperand(0);
-//                         Value *rop = bin_op->getOperand(1);
-//                         if (temp_set.count(lop) == 0) {
-//                             use_set.insert(lop);
-//                         }
-//                         if (temp_set.count(rop) == 0) {
-//                             use_set.insert(rop);
-//                         }
-//                     }
-//                     temp_set.insert(&I);
-//                 }
-//             return use_set;
-//         }
-
-//         std::set<Value*> computeDEF(BasicBlock &BB){
-//             std::set<Value*> temp_set;
-//             std::set<Value*> def_set;
-            
-//                 for (auto &I : BB) {
-//                     if (auto bin_op = dyn_cast<BinaryOperator>(&I)) {
-//                     Value *lop = bin_op->getOperand(0);
-//                     Value *rop = bin_op->getOperand(1);
-//                     if ((temp_set.count(lop) != 0) || (temp_set.count(rop) != 0)){
-//                         def_set.insert(&I);
-//                     }
-//                     }
-//                     temp_set.insert(&I);
-//                 }
-            
-//             // for (Value *V : def_set) {
-//             //     V->print(errs());
-//             //     errs() << "\n";
-//             // }
-//             // errs() << "\n";
-//             return def_set;
-//         }
-//     };
-// }
-
-// char AnticipatedExpressions::ID = 0;
-// static RegisterPass<AnticipatedExpressions> X("antiexp", "Anticipated Expressions Pass");
-// //Perform code hoisting
-// // for (auto &I : BB) {
-// //   if (auto bin_op = dyn_cast<BinaryOperator>(&I)) {
-// //     Value *lhs = bin_op->getOperand(0);
-// //     Value *rhs = bin_op->getOperand(1);
-// //     if (in_map[&BB].count(lhs) && in_map[&BB].count(rhs)) {
-// //       bool can_hoist = true;
-// //       for (BasicBlock *Succ : successors(&BB)) {
-// //         if (out_map[Succ].count(lhs) || out_map[Succ].count(rhs) ||
-// //             def_map[Succ].count(lhs) || def_map[Succ].count(rhs)) {
-// //           can_hoist = false;
-// //           break;
-// //         }
-// //       }
-// //       if (can_hoist) {
-// //         I.moveBefore(&(BB.front()));
-// //       }
-// //     }
-// //   }
-// // }
-
 namespace{
     struct AnticipatedExpressions: public FunctionPass{
         static char ID;
@@ -158,7 +22,6 @@ namespace{
             Instruction* I;
             std::string opname;
             unsigned int opcode;
-
             Expression(){
                 op1 = NULL;
                 op2 = NULL;
@@ -166,16 +29,20 @@ namespace{
                 opname = "";
                 I = NULL;
             } 
+            bool operator== (const Expression &ele) const{
+                return (this->op1 == ele.op1) && (this->op2 == ele.op2) && (this->opname == ele.opname);
+            }
         };
 
         bool isFeasibleInstruction(Instruction &I)
         {
-            if(I.isBinaryOp() && !isa<StoreInst>(I) && !isa<AllocaInst>(I) && !isa<LoadInst>(I))
+            if(I.isBinaryOp(I.getOpcode()) && !isa<StoreInst>(I) && !isa<AllocaInst>(I) && !isa<LoadInst>(I))
                 return true;
             return false;
         }
-
-        std::set<Expression *> computeExpression(Function &F, DenseMap<Expression *, unsigned> &exToBit, unsigned k){
+        
+        // This computes universal set of expressions
+        std::set<Expression *> computeExpression(Function &F, DenseMap<Expression *, unsigned> &exToBit, DenseMap<unsigned, Expression *> &BitToex, DenseMap<unsigned, std::set<BasicBlock *>> &exToBlock, unsigned k){
             std::set<Expression *> expressions;
             for(BasicBlock &BB: F){
                 for(Instruction &I: BB){
@@ -186,9 +53,22 @@ namespace{
                         expr->opcode = I.getOpcode();
                         expr->opname = I.getOpcodeName(I.getOpcode());
                         expr->I = &I;
-                        expressions.insert(expr);
-                        exToBit[expr] = k; // Assigned each expressiona unique integer
-                        k++;
+                        
+                        bool f = true;
+                        for(auto *ele: expressions){
+                            if((*expr) == *(ele)){
+                                f = false;
+                                exToBlock[exToBit[expr]].insert(&BB);
+                                break;
+                            }
+                        }
+                        if(f){
+                            expressions.insert(expr);
+                            exToBit[expr] = k; // Assigned each expressiona unique integer
+                            BitToex[k] = expr;
+                            exToBlock[k].insert(&BB);
+                            k++;
+                        }
                     }
                 }
             }
@@ -198,10 +78,12 @@ namespace{
         bool runOnFunction(Function& F){
             // Expression to bit
             DenseMap<Expression *, unsigned> exToBit;
+            DenseMap<unsigned, Expression *> BitToex;
+            DenseMap<unsigned, std::set<BasicBlock *>> exToBlock;
             unsigned expressPos = 0;
 
             // Compute Expression
-            std::set<Expression *> expressions = computeExpression(F, exToBit, expressPos);
+            std::set<Expression *> expressions = computeExpression(F, exToBit, BitToex, exToBlock, expressPos);
             unsigned int size = expressions.size();
             std::map<BasicBlock *, BitVector> UseBitMap, DefBitMap, INBitMap, OUTBitMap;
 
@@ -210,8 +92,8 @@ namespace{
             std::map<BasicBlock *, std::set<Expression *>> useMap, defMap;
             useMap = computeUSE(F);
             defMap = computeDEF(F);
-            UseBitMap = computeBIT(F,useMap, exToBit, size);
-            DefBitMap = computeBIT(F, defMap, exToBit, size);
+            UseBitMap = computeBIT(F, useMap, exToBit, expressions,size);
+            DefBitMap = computeBIT(F, defMap, exToBit, expressions, size);
 
             // Initialise IN and OUT sets
             initialiseIN_OUT(F, INBitMap, OUTBitMap, size);
@@ -227,16 +109,17 @@ namespace{
                     BitVector UseBit = UseBitMap[&BB];
                     BitVector DefBit = DefBitMap[&BB];
                     BitVector tempBit(size, false);
-                    for(BasicBlock *succ: successors(&BB)){
-                        BitVector INBit = INBitMap[succ];
-                        OUTBit &= INBit;
-                    }
-                    OUTBitMap[&BB] = OUTBit;
-                    for (unsigned i = 0; i < OUTBit.size(); ++i) {
-                        if (DefBit.test(i)) {
-                            OUTBit.reset(i);
+                    if(!successors(&BB).empty()){
+                        OUTBit = INBitMap[*succ_begin(&BB)];
+                        for(BasicBlock *succ: successors(&BB)){
+                            BitVector INBit = INBitMap[succ];
+                            OUTBit &= INBit;
                         }
                     }
+                    
+                    OUTBitMap[&BB] = OUTBit;
+                    DefBit.flip();
+                    OUTBit &= DefBit;
                     OUTBit|=UseBit;
                     if(!(OUTBit == INBit) ){
                         modified = true;
@@ -247,25 +130,38 @@ namespace{
             printMap(useMap, "USE", F);
             printMap(defMap, "DEF", F);
             printMapping(exToBit);
+            // errs() << "IN\n";
+            // printBitMap(F, INBitMap);
+            // errs() << "OUT\n";
+            // printBitMap(F, OUTBitMap);
+            // errs() << "USE\n";
+            // printBitMap(F, UseBitMap);
+            // errs() << "DEF\n";
+            // printBitMap(F, DefBitMap);
             errs() << "IN\n";
-            printBitMap(F, INBitMap);
+            printBitMap(F, INBitMap, BitToex);
             errs() << "OUT\n";
-            printBitMap(F, OUTBitMap);
+            printBitMap(F, OUTBitMap, BitToex);
+            errs() << "USE\n";
+            printBitMap(F, UseBitMap, BitToex);
+            errs() << "DEF\n";
+            printBitMap(F, DefBitMap, BitToex);
+            errs() << "USE MAP\n";
+            printOGmap(F, useMap);
+            errs() << "\nDEF MAP\n";
+            printOGmap(F, defMap);
+            printexToBlock(exToBlock);
             return true;
         }
 
-        void printBitMap(Function &F, std::map<BasicBlock *, BitVector> bmap){
-            for(auto &BB: F){
-                BitVector temp = bmap[&BB];
-                for (int i = 0; i < temp.size(); i++) {
-                    errs() << temp[i];
-                }
-                errs() << "\n";
-            }
+        bool isSameInst(Instruction &I, Instruction &J){
+            if(I.getOperand(0) == J.getOperand(0) && I.getOperand(1) == J.getOperand(1) && I.getOpcode() == J.getOpcode())
+                return true;
+            return false;
         }
         
         // Compute BIT
-        std::map<BasicBlock *, BitVector> computeBIT(Function &F, std::map<BasicBlock *, std::set<Expression *>> ds, DenseMap<Expression *, unsigned> exToBit, unsigned int size){
+        std::map<BasicBlock *, BitVector> computeBIT(Function &F, std::map<BasicBlock *, std::set<Expression *>> ds, DenseMap<Expression *, unsigned> exToBit, std::set<Expression *> expressions,unsigned int size){
             std::map<BasicBlock *, BitVector> BlockBitMap;
             for (auto &BB : F) {
                 BitVector helper(size, false);
@@ -274,6 +170,13 @@ namespace{
                     continue;
                 }
                 for (auto &use : ds[&BB]) {
+                    for(auto *ele: expressions){
+                        if((*use) == *(ele)){   
+                            unsigned bit = exToBit[ele];
+                            helper.set(bit);
+                            break;
+                        }
+                    }
                     unsigned bit = exToBit[use];
                     helper.set(bit);
                 }
@@ -297,6 +200,7 @@ namespace{
                         expr->opcode = I.getOpcode();
                         expr->opname = I.getOpcodeName(I.getOpcode());
                         expr->I = &I;
+                       // expr->I = &I;
 
                         if (auto *defInst1 = dyn_cast<Instruction>(expr->op1)) {
                             if (defInst1->getParent() == &BB || definedInstructions.count(defInst1)) {
@@ -330,13 +234,14 @@ namespace{
                     if(isFeasibleInstruction(I)){
                         for(auto *use: I.users()){
                             Instruction *Inst = dyn_cast<Instruction>(use);
-                            if (Inst){
+                            if (Inst && isFeasibleInstruction(*Inst)){
                                 Expression *expr = new Expression;
-                                expr->op1 = I.getOperand(0);
-                                expr->op2 = I.getOperand(1);
-                                expr->opcode = I.getOpcode();
-                                expr->opname = I.getOpcodeName(I.getOpcode());
-                                expr->I = &I;
+                                expr->op1 = Inst->getOperand(0);
+                                expr->op2 = Inst->getOperand(1);
+                                expr->opcode = Inst->getOpcode();
+                                expr->opname = Inst->getOpcodeName(Inst->getOpcode());
+                                expr->I = Inst;
+                                //expr->I = Inst;
                                 DefExpressions.insert(expr);
                             }
                         }
@@ -350,19 +255,9 @@ namespace{
         void initialiseIN_OUT(Function &F, std::map<BasicBlock *, BitVector> &IN,std::map<BasicBlock *, BitVector> &OUT,unsigned size){
             for(auto &BB: F){
                 IN[&BB] = BitVector(size, true);
-                OUT[&BB] = BitVector(size, true);
+                OUT[&BB] = BitVector(size, false);
             }
         }
-        // // Compute IN
-        // void computeIN_OUT(Function &F){
-        //     std::map<BasicBlock *, std::set<Expression*>> IN, OUT;
-
-        //     // Initialize IN sets to universal set of Expressions
-        //     for(BasicBlock &BB: F){
-        //         IN[&BB] = computeExpressionBB(BB);
-        //     }
-            
-        // }
 
         void printMap(std::map<BasicBlock *, std::set<Expression*>> ds, std::string s, Function &F){
             errs() << s << " \n";
@@ -379,7 +274,8 @@ namespace{
                     Value *C = use->op2;
                     std::string opname = use->opname;
                     // if(B == D)  errs() << "True";
-                    errs() << "\t" << *B << " " << opname << " " << *C << "\n";
+                    // errs() << "\t" << *B << " " << opname << " " << *C << "\n";
+                    errs() << *(use->I) << "\n";
                 }
             }
             errs() << "\n";
@@ -389,6 +285,54 @@ namespace{
         void printMapping(DenseMap<Expression *, unsigned> exToBit){
             for(const auto &pair: exToBit){
                 errs() << " " << pair.second ;
+            }
+            errs() << "\n";
+        }
+
+        
+        void printexToBlock(DenseMap<unsigned, std::set<BasicBlock *>> exToBlock){
+            for(const auto &pair: exToBlock){
+                for(auto ele: pair.second){
+                    errs() << ele << " ";
+                }
+                errs() << "\n";
+            }
+            errs() << "\n";
+        }
+
+        // void printBitMap(Function &F, std::map<BasicBlock *, BitVector> bmap){
+        //     for(auto &BB: F){
+        //         BitVector temp = bmap[&BB];
+        //         for (auto i = 0; i < temp.size(); i++) {
+        //             errs() << temp[i];
+        //         }
+        //         errs() << "\n";
+        //     }
+        // }
+
+        void printBitMap(Function &F, std::map<BasicBlock *, BitVector> bmap, DenseMap<unsigned, Expression*> BitToex){
+            for(auto &BB: F){
+                BitVector temp = bmap[&BB];
+                for (auto i = 0; i < temp.size(); i++) {
+                    errs() << temp[i];
+                    if(temp[i] == 1){
+                        auto ele = BitToex[i];
+                        errs() << *(ele->I);
+                    }
+                }
+                errs() << "\n";
+            }
+        }
+
+        
+        void printOGmap(Function &F, std::map<BasicBlock *, std::set<Expression *>> ds){
+            for(auto &BB: F){
+                auto temp = ds[&BB];
+                for(auto expr: temp){
+                    errs() << "\nOP1: " << *expr->op1;
+                    errs() << "\nOP2: " << *expr->op2;
+                    errs() << "\nOPName: " << expr->opname;
+                }
             }
             errs() << "\n";
         }
