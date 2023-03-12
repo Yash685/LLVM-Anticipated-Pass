@@ -102,9 +102,9 @@ namespace{
         bool runOnFunction(Function& F){
             // Expression to bit
             bool changed = true;
-            int iter = 0;
+            bool didChanged = false;
+            
             while(changed){
-            iter++;
             DenseMap<Expression *, unsigned> exToBit;
             DenseMap<unsigned, Expression *> BitToex;
             DenseMap<unsigned, std::set<BasicBlock *>> exToBlock;
@@ -185,10 +185,14 @@ namespace{
                 //printexToBlock(exToBlock);
                 //printexToBit(exToBit);
                 codeHoisting(F,exToBlock, exToBit, BitToex, OUTBitMap, INBitMap, changed);
-                if(changed)
+                if(changed){
+                    didChanged = true;
                     changed = true;
+                }
             }
-            return true;
+            if(didChanged)
+                return true;
+            return false;
         }
 
 
