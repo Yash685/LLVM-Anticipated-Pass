@@ -26,7 +26,7 @@ namespace{
             Instruction* I;
             std::string opname;
             unsigned int opcode;
-            bool isHoisted;
+            bool isHoisted, hasnsw, hasnuw;
             Instruction *hoist_inst;
             Expression(){
                 op1 = NULL;
@@ -35,6 +35,8 @@ namespace{
                 opname = "";
                 I = NULL;
                 isHoisted = false;
+                hasnsw = false;
+                hasnuw = false;
                 hoist_inst = NULL;
             }
              
@@ -59,7 +61,7 @@ namespace{
 
         bool isFeasibleInstruction(Instruction &I)
         {
-            if(I.isBinaryOp(I.getOpcode()) && !isa<StoreInst>(I) && !isa<AllocaInst>(I) && !isa<LoadInst>(I))
+            if(( I.isBinaryOp(I.getOpcode())) && !isa<StoreInst>(I) && !isa<AllocaInst>(I) && !isa<LoadInst>(I))
                 return true;
             return false;
         }
@@ -69,6 +71,8 @@ namespace{
             std::set<Expression *> expressions;
             for(BasicBlock &BB: F){
                 for(Instruction &I: BB){
+                    errs() << "\n Instruction: " << I;
+                    errs() << "\n NUM OF Operands" << I.getNumOperands();
                     if(isFeasibleInstruction(I)){
                         Expression *expr = new Expression;
                         expr->op1 = I.getOperand(0);
@@ -76,6 +80,8 @@ namespace{
                         expr->opcode = I.getOpcode();
                         expr->opname = I.getOpcodeName(I.getOpcode());
                         expr->I = &I;
+                        // expr->hasnsw = I.hasNoSignedWrap();
+                        // expr->hasnuw = I.hasNoUnsignedWrap();
                         
                         bool f = true;
                         for(auto *ele: expressions){
@@ -266,9 +272,24 @@ namespace{
                                                 }
                                                 else{
                                                     hoist_expr->isHoisted = true;
-                                                    newI = bo->Create(static_cast<llvm::Instruction::BinaryOps>(hoist_expr->opcode), hoist_expr->op1, hoist_expr->op2, "yp", dyn_cast<Instruction>(BB->getTerminator()));
+                                                    // if(hoist_expr->I->hasNoSignedWrap()){
+                                                    //      newI = bo->CreateNSW(static_cast<llvm::Instruction::BinaryOps>(hoist_expr->opcode), hoist_expr->op1, 
+                                                    //      hoist_expr->op2, "yp", BB->getTerminator());
+                                                    // }else if(hoist_expr->I->hasNoUnsignedWrap()){
+                                                    //      newI = bo->CreateNUW(static_cast<llvm::Instruction::BinaryOps>(hoist_expr->opcode), hoist_expr->op1, 
+                                                    //      hoist_expr->op2, "yp", BB->getTerminator());
+                                                    // }else{
+                                                    //      newI = bo->Create(static_cast<llvm::Instruction::BinaryOps>(hoist_expr->opcode), hoist_expr->op1, 
+                                                    //      hoist_expr->op2, "yp", BB->getTerminator());
+                                                    // }
+                                                    newI = bo->CreateWithCopiedFlags(static_cast<llvm::Instruction::BinaryOps>(hoist_expr->opcode), hoist_expr->op1, 
+                                                         hoist_expr->op2, hoist_expr->I,"yp", BB->getTerminator());
                                                     hoist_expr->hoist_inst = newI;
                                                 }
+                                                // if(hoist_expr->hasnsw)
+                                                //     newI->setHasNoSignedWrap(true);
+                                                // else if(hoist_expr->hasnuw)
+                                                //     newI->setHasNoUnsignedWrap(true);
                                                 errs() << "\n Hoisted Instruction\n";
                                                 newI->print(errs());
                                                 errs() << "\n------\n";
