@@ -1,0 +1,78 @@
+LLVM: low level virtual machine
+> It is and compilation infrasture, used to build compilers
+> eg c, c++, julia, rust
+> Development and runtime of compilers
+> Tools: Front end, middle end, back end
+> Front end: Takes file and converts to IR(.ll)
+> Middle end: Take IR and optimize it
+> Back end: It produces machine code
+
+Setup:
+
+
+git clone https://github.com/llvm/llvm-project.git
+cd llvm_project
+git reset --hard f08d86fc7f4479d5f44d75c720201334682075b8
+
+mkdir mybuild
+cd mybuild
+[<NIY149>]
+
+1.1) cmake ../llvm -DCMAKE_BUILD_TYPE=Release
+ -> 1.2) 	
+ -> 2)ninja.
+ -><path to build>/bin/opt -load <path.so> -enable-new-pm=0 -hello +*.ll (<> are markers no need in actual command line code)
+ ->clang -O0 -S -emit-llvm input.c -o input.ll
+../llvm-project/build/bin/opt -load ../llvm-project/build/lib/LLVMUseSet.so -useset --enable-new-pm=0 input.ll
+
+Coding Standards
+1. Do not use static constructors
+2. Use of class and struct keywords
+3. Use auto when required, beware of unnecessary copies with auto
+4. Use #include as little as possible
+5. Don't use else after return
+6. Do not use LLVM using namespace std
+7. Do not use default labels in fully covered switches over enumerations
+8. Use range based for loops whenever possible
+9. Do not evaluate end() every time through loop *
+10. #include is forbidden, use eaw_
+11. For an enumerable sequence of values, the XXXbegin() function (or method) returns an 
+    iterator to the start of the sequence, the XXXend() function returns an iterator pointing 
+    to one past the last valid element of the sequence, and there is some XXXiterator data type 
+    that is common between the two operations.
+
+
+Points
+1. LLD is a linker from the LLVM project that is a drop-in replacement for system linkers 
+   and runs much faster than them. It also provides features that are useful for toolchain 
+   developers.
+2. Assert is a form of documentation, like comments. Like comments, you would not normally 
+   ship them to customers - they don't belong in release code
+3. Pass runs on each of functions in program so we inherit FunctionPass. If we need to see whole
+   program we inherit ModulePass
+4. An iterator over Module gives list of Functions
+5. AN iterator over Functions gives list of basic blocks
+6. An iterator over a Block gives a list of Instructions, and we can iterate over the operands of the instructions too
+7. The PassManager provides a nice command line option (-time-passes) that allows you to get information about the execution 
+   time of your pass along with the other passes you queue up
+llvm/lib/tranforms/Scalar/GVN   
+
+
+1. Perform a forward dataflow analysis that computes the set of anticipated expressions for each basic block in the control flow graph.
+2. Traverse the control flow graph and insert instructions that hoist the anticipated expressions to a common ancestor of their uses.
+3. Remove the original instructions that were hoisted.
+
+../llvm-project/BUILD/bin/clang -S -emit-llvm input.c -Xclang -disable-O0-optnone -o input.ll
+../llvm-project/BUILD/bin/opt -p=mem2reg -S input.ll -o in.ll
+../llvm-project/build/bin/opt -dot-cfg in.ll -disable-output -enable-new-pm=0
+
+How should I check where instruction is present?
+How to insert into instruction into specified block?
+
+TODO
+- Instruction falg
+- not_for_loop error in input .ll file
+_ anti_for_loop ,, mul nsw and mul
+
+
+
